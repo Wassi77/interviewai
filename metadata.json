@@ -1,0 +1,6 @@
+{
+  "name": "InterviewAce AI",
+  "description": "Practice smarter. Interview with AI. Get hired with confidence. AI-powered mock interviews, instant evaluation, detailed feedback, and 7-day preparation roadmap.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
