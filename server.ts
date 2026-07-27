@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -69,7 +69,7 @@ async function callAI(params: {
   }
 
   const messages = [
-    { role: 'system', content: `${systemInstruction}\n\nIMPORTANT: You MUST respond with valid JSON only. No markdown, no code fences, no backticks, no explanation. Output ONLY the raw JSON object with no wrapper.` },
+    { role: 'system', content: `${systemInstruction}\n\nIMPORTANT: You MUST respond with valid JSON only. No markdown, no code fences, no backticks, no explanation. Output ONLY the raw JSON object.` },
     { role: 'user', content: contents },
   ];
 
@@ -436,8 +436,28 @@ Respond in valid JSON only.`;
   }
 });
 
+// Serve static files in production
+if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+  const distPath = path.join(process.cwd(), 'dist');
+  app.use(express.static(distPath));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+} else {
+  // Development mode with Vite
+  app.get('*', async (req, res, next) => {
+    // Only for non-API routes in dev, Vite middleware handles it
+    if (req.path.startsWith('/api/')) {
+      return next();
+    }
+    // Let Vite middleware handle dev routes
+    next();
+  });
+}
+
 export default app;
 
+// Only start server locally (not on Vercel)
 if (!process.env.VERCEL) {
   async function startServer() {
     if (process.env.NODE_ENV !== 'production') {
@@ -447,12 +467,6 @@ if (!process.env.VERCEL) {
         appType: 'spa',
       });
       app.use(vite.middlewares);
-    } else {
-      const distPath = path.join(process.cwd(), 'dist');
-      app.use(express.static(distPath));
-      app.get('*', (req, res) => {
-        res.sendFile(path.join(distPath, 'index.html'));
-      });
     }
 
     app.listen(PORT, '0.0.0.0', () => {
@@ -460,5 +474,8 @@ if (!process.env.VERCEL) {
     });
   }
 
-  startServer();
+  startServer().catch(err => {
+    console.error('Failed to start server:', err);
+    process.exit(1);
+  });
 }
