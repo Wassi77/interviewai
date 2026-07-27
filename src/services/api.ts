@@ -21,13 +21,11 @@ async function parseResponseError(res: Response, fallbackAction: string): Promis
 
   if (!errorMsg || errorMsg.trim() === '') {
     if (res.status === 404) {
-      errorMsg = 'API endpoint not found (404). Check Vercel routing configuration.';
-    } else if (res.status === 500) {
-      errorMsg = 'Server internal error (500). Please ensure GEMINI_API_KEY is set in Vercel Project Settings > Environment Variables.';
+      errorMsg = 'API endpoint not found (404). Check Vercel deployment logs.';
     } else if (res.status === 504) {
-      errorMsg = 'Vercel serverless function timed out (504). Please try again.';
+      errorMsg = 'Serverless function timed out (504). Your AI provider may be slow. Try again or switch to a faster model in Settings.';
     } else {
-      errorMsg = `${fallbackAction} (HTTP ${res.status}).`;
+      errorMsg = `${fallbackAction} (HTTP ${res.status}). Check Vercel Function Logs for details.`;
     }
   }
 

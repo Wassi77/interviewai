@@ -71,15 +71,15 @@ export const API_PRESETS: APIPreset[] = [
   { label: 'OpenAI', provider: 'openai', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
   { label: 'Gemini', provider: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com', model: 'gemini-2.0-flash' },
   { label: 'Groq', provider: 'openai', baseUrl: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile' },
-  { label: 'OpenRouter', provider: 'openai', baseUrl: 'https://openrouter.ai/api/v1', model: 'openai/gpt-4o-mini' },
+  { label: 'OpenRouter', provider: 'openai', baseUrl: 'https://openrouter.ai/api/v1', model: 'inclusionai/ling-3.0-flash:free' },
   { label: 'Together', provider: 'openai', baseUrl: 'https://api.together.xyz/v1', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo' },
 ];
 
 export const DEFAULT_API_CONFIG: APIConfig = {
   provider: 'openai',
-  baseUrl: 'https://api.openai.com/v1',
-  apiKey: '',
-  model: 'gpt-4o-mini',
+  baseUrl: 'https://openrouter.ai/api/v1',
+  apiKey: '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',
+  model: 'inclusionai/ling-3.0-flash:free',
 };
 
 export type PageView = 'home' | 'setup' | 'interview' | 'results' | 'history' | 'about';

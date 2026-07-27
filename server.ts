@@ -1,11 +1,15 @@
 import express from 'express';
 import path from 'path';
-import { GoogleGenAI, Type } from '@google/genai';
 
 const app = express();
 const PORT = 3000;
 
 app.use(express.json({ limit: '10mb' }));
+
+app.use((req, _res, next) => {
+  console.log(`[${req.method}] ${req.path}`);
+  next();
+});
 
 function extractApiConfig(req: express.Request) {
   const bodyConfig = req.body.apiConfig;
@@ -45,6 +49,7 @@ async function callAI(params: {
   const { provider, baseUrl, apiKey, model, systemInstruction, contents, responseSchema } = params;
 
   if (provider === 'gemini') {
+    const { GoogleGenAI } = await import('@google/genai');
     const ai = new GoogleGenAI({
       apiKey,
       httpOptions: {
@@ -96,9 +101,23 @@ async function callAI(params: {
 }
 
 function handleApiError(error: any, res: express.Response, contextMessage: string) {
-  console.error(`Error in ${contextMessage}:`, error);
+  console.error(`[ERROR] ${contextMessage}:`, error?.message || error);
   const errMsg = error?.message || String(error);
   const lowerMsg = errMsg.toLowerCase();
+
+  const apiStatusMatch = errMsg.match(/^API (\d{3}):/);
+  if (apiStatusMatch) {
+    const upstreamStatus = parseInt(apiStatusMatch[1], 10);
+    const bodyStart = errMsg.indexOf('{');
+    let upstreamBody = bodyStart >= 0 ? errMsg.slice(bodyStart) : errMsg.slice(apiStatusMatch[0].length).trim();
+    try {
+      const parsed = JSON.parse(upstreamBody);
+      upstreamBody = parsed.error?.message || parsed.error || JSON.stringify(parsed);
+    } catch {}
+    return res.status(upstreamStatus >= 500 ? 502 : upstreamStatus).json({
+      error: `Upstream API error: ${upstreamBody}`,
+    });
+  }
 
   if (
     lowerMsg.includes('429') ||
@@ -107,7 +126,7 @@ function handleApiError(error: any, res: express.Response, contextMessage: strin
     lowerMsg.includes('rate_limit')
   ) {
     return res.status(429).json({
-      error: 'API rate limit or quota exceeded. Please wait a moment or check your provider plan limits.',
+      error: 'API rate limit or quota exceeded. Please wait a moment or change to a different model in Settings.',
     });
   }
 
@@ -124,7 +143,7 @@ function handleApiError(error: any, res: express.Response, contextMessage: strin
     lowerMsg.includes('auth')
   ) {
     return res.status(401).json({
-      error: 'Authentication error: Please verify your API key is valid and has access to the selected model. Update it in Settings.',
+      error: 'Authentication error: Your API key is invalid or expired. Update it in Settings.',
     });
   }
 
@@ -136,12 +155,12 @@ function handleApiError(error: any, res: express.Response, contextMessage: strin
     lowerMsg.includes('does not support')
   ) {
     return res.status(400).json({
-      error: `Model does not support structured output. Choose a different model, or if using OpenRouter try adding a "-json" suffix (e.g. "gpt-4o-mini" stays same, but "claude-3-haiku" → "claude-3-haiku-json").`,
+      error: 'This model does not support the required output format. Try a different model name in Settings.',
     });
   }
 
   return res.status(500).json({
-    error: errMsg || `An error occurred while ${contextMessage}.`,
+    error: errMsg || `An error occurred while ${contextMessage}. Check Vercel Function Logs.`,
   });
 }
 
@@ -182,10 +201,10 @@ Rules:
 - Respond in valid JSON with fields: question (string), contextNote (optional string).`;
 
     const responseSchema = {
-      type: Type.OBJECT,
+      type: 'object',
       properties: {
-        question: { type: Type.STRING, description: 'The first interview question' },
-        contextNote: { type: Type.STRING, description: 'Optional brief tip or context' },
+        question: { type: 'string', description: 'The first interview question' },
+        contextNote: { type: 'string', description: 'Optional brief tip or context' },
       },
       required: ['question'],
     };
@@ -249,13 +268,13 @@ Language requirement: Provide all text (feedback, betterAnswer, nextQuestion) in
 Respond in valid JSON only.`;
 
     const responseSchema = {
-      type: Type.OBJECT,
+      type: 'object',
       properties: {
-        score: { type: Type.INTEGER, description: 'Score from 1 to 10' },
-        feedback: { type: Type.STRING, description: 'Detailed constructive feedback' },
-        betterAnswer: { type: Type.STRING, description: 'Professional rewritten ideal answer' },
-        keyTakeaway: { type: Type.STRING, description: 'Key takeaway or tip' },
-        nextQuestion: { type: Type.STRING, description: 'Next interview question if not last question' },
+        score: { type: 'integer', description: 'Score from 1 to 10' },
+        feedback: { type: 'string', description: 'Detailed constructive feedback' },
+        betterAnswer: { type: 'string', description: 'Professional rewritten ideal answer' },
+        keyTakeaway: { type: 'string', description: 'Key takeaway or tip' },
+        nextQuestion: { type: 'string', description: 'Next interview question if not last question' },
       },
       required: ['score', 'feedback', 'betterAnswer', 'keyTakeaway'],
     };
@@ -332,39 +351,39 @@ Ensure feedback tone is empowering, realistic, and highly educational. Respond i
 Respond in valid JSON only.`;
 
     const responseSchema = {
-      type: Type.OBJECT,
+      type: 'object',
       properties: {
-        overallScore: { type: Type.INTEGER, description: 'Overall score 1-100' },
+        overallScore: { type: 'integer', description: 'Overall score 1-100' },
         breakdown: {
-          type: Type.OBJECT,
+          type: 'object',
           properties: {
-            communication: { type: Type.INTEGER },
-            technicalKnowledge: { type: Type.INTEGER },
-            confidence: { type: Type.INTEGER },
-            problemSolving: { type: Type.INTEGER },
-            grammar: { type: Type.INTEGER },
-            professionalism: { type: Type.INTEGER },
+            communication: { type: 'integer' },
+            technicalKnowledge: { type: 'integer' },
+            confidence: { type: 'integer' },
+            problemSolving: { type: 'integer' },
+            grammar: { type: 'integer' },
+            professionalism: { type: 'integer' },
           },
           required: ['communication', 'technicalKnowledge', 'confidence', 'problemSolving', 'grammar', 'professionalism'],
         },
-        strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
-        weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
-        professionalSummary: { type: Type.STRING },
+        strengths: { type: 'array', items: { type: 'string' } },
+        weaknesses: { type: 'array', items: { type: 'string' } },
+        professionalSummary: { type: 'string' },
         roadmap: {
-          type: Type.ARRAY,
+          type: 'array',
           items: {
-            type: Type.OBJECT,
+            type: 'object',
             properties: {
-              day: { type: Type.INTEGER },
-              title: { type: Type.STRING },
-              focus: { type: Type.STRING },
-              tasks: { type: Type.ARRAY, items: { type: Type.STRING } },
+              day: { type: 'integer' },
+              title: { type: 'string' },
+              focus: { type: 'string' },
+              tasks: { type: 'array', items: { type: 'string' } },
             },
             required: ['day', 'title', 'focus', 'tasks'],
           },
         },
-        suggestedTopics: { type: Type.ARRAY, items: { type: Type.STRING } },
-        recommendedQuestions: { type: Type.ARRAY, items: { type: Type.STRING } },
+        suggestedTopics: { type: 'array', items: { type: 'string' } },
+        recommendedQuestions: { type: 'array', items: { type: 'string' } },
       },
       required: ['overallScore', 'breakdown', 'strengths', 'weaknesses', 'professionalSummary', 'roadmap', 'suggestedTopics', 'recommendedQuestions'],
     };
