@@ -1,0 +1,5 @@
+node_modules
+dist
+interviewai-main
+.env
+.env.*
